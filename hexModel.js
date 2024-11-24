@@ -132,6 +132,7 @@ export class Game {
     constructor(size) {
         this.size = size;
         this.board = range(size).map(iRow => range(size).map((iCol) => new Hex(this, iRow, iCol)));
+        this.chains = new Map();
         this.whiteChains = new Set();
         this.blackChains = new Set();
         // this.currentColor = white;
