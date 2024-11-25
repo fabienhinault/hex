@@ -2,10 +2,9 @@
 
 import {range} from './libhex.js' 
 
-let white = {value: 1, getICoord: h => h.iRow};
-let black = {value: -1, getICoord: h => h.iCol};
+export let white = {value: 1, getICoord: h => h.iRow};
+export const black = {value: -1, getICoord: h => h.iCol, other: white};
 white.other = black;
-black.other = white;
 
 //class Player
 
@@ -53,7 +52,8 @@ class Hex {
             while (!iter.done) {
                 firstChain.addChain(iter.next().value);
             }
-        } 
+        }
+        return this.chain.isWinning();
     }
 
     getICoord() {
@@ -66,6 +66,7 @@ class Chain {
         this.game = hex.game;
         this.isTouchingHigh = (hex.getICoord() === this.game.size - 1);
         this.isTouchingLow = (hex.getICoord() === 0);
+        this.game.chains.get(hex.color).push(this);
     }
 /*
 
@@ -90,7 +91,7 @@ class Chain {
 
 */
     isWinning() {
-        return this.isTouchingiHigh && this.isTouchingLow;
+        return this.isTouchingHigh && this.isTouchingLow;
     }
 
 }
@@ -105,7 +106,7 @@ class GameStateWhitesTurn extends GameState {
     }
 
     play(iRow, iCol) {
-        this.game.board[iRow][iCol].play(white);
+        return this.game.board[iRow][iCol].play(white);
     }
 
     next() {
@@ -120,11 +121,11 @@ class GameStateBlacksTurn extends GameState {
     }
 
     play(iRow, iCol) {
-        const hex = this.game.board[iRow][iCol];
-        hex.play(black);
-        if (!hex.chain.isWinning()) {
-            return new GameStateWhitesTurn(this.game);
-        }
+        return this.game.board[iRow][iCol].play(black);
+    }
+
+    next() {
+        return new GameStateWhitesTurn(this.game);
     }
 }
 
@@ -133,19 +134,23 @@ export class Game {
         this.size = size;
         this.board = range(size).map(iRow => range(size).map((iCol) => new Hex(this, iRow, iCol)));
         this.chains = new Map();
-        this.whiteChains = new Set();
-        this.blackChains = new Set();
+        this.chains.set(white, []);
+        this.chains.set(black, []);
         // this.currentColor = white;
         this.currentState = new GameStateWhitesTurn(this);
     }
     play(iRow, iCol) {
-        this.currentState.play(iRow, iCol);
-        this.currentState = this.currentState.next();
+        const winning = this.currentState.play(iRow, iCol);
+        if (winning) {
+            return true;
+        } else {
+            this.currentState = this.currentState.next();
+        }
     }
 
     getNeighbourHexes(iRow, iCol) {
         return [[iRow - 1, iCol], [iRow - 1, iCol + 1], [iRow, iCol -1], [iRow, iCol + 1], [iRow + 1, iCol -1], [iRow + 1, iCol]].filter(
             rc => rc[0] >= 0 && rc[0] < this.size && rc[1] >= 0 && rc[1] < this.size).map(
-            rc => this.board[rc[0], rc[1]]);
+            rc => this.board[rc[0]][rc[1]]);
     }
 }
