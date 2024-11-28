@@ -136,6 +136,9 @@ class Chain {
     }
 
     getValue() {
+        if (this.isWinning()) {
+            return 4 * this.game.size;
+        }
         let value = this.maxICoord - this.minICoord;
         if (this.isTouchingHigh || this.isTouchingLow) {
             value *= 2;
@@ -152,6 +155,20 @@ export class Game {
         this.chains.set(white, new Set());
         this.chains.set(black, new Set());
         this.currentColor = white;
+    }
+
+    copy() {
+        let g = new Game(this.size);
+        for (let iRow = 0; iRow < this.size; iRow++) {
+            for (let iCol = 0; iCol < this.size; iCol++) {
+                let hex = this.board[iRow][iCol];
+                if (hex.color !== undefined) {
+                    g.board[iRow][iCol].play(hex.color);
+                }
+            }
+        }
+        g.currentColor = this.currentColor;
+        return g;
     }
 
     play(iRow, iCol) {
@@ -184,15 +201,14 @@ export class Game {
         return this.play(parseInt(str.substr(1)) - 1, this.colIndexFromLetter(letter));
     }
 
-    async prompt() {
+    async twoPlayers() {
         const rl = readline.createInterface({
           input: process.stdin,
           output: process.stdout
         });
-        let won = false;
-        while (!won) {
+        while (true) {
             try{
-                const winningChain = this.promptOnce();
+                const winningChain = await this.promptOnce(rl);
                 if (winningChain) {
                     return;
                 }
@@ -225,7 +241,9 @@ export class Game {
     }
 
     getRawValue() {
-        return Math.max(this.chains.get(white).map(c => c.value)) - Math.max(this.chains.get(black).map(c => c.value));
+        return Math.max(...[...this.chains.get(white)].map(c => c.getValue())) - 
+            Math.max(...[...this.chains.get(black)].map(c => c.getValue()));
     }
+
 
 }
