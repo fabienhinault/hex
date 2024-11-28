@@ -1,7 +1,29 @@
 'use strict';
 
+import {Game} from './model/hexModel.js';
+import { RandomBot } from './model/randombot.js';
+import * as readline from "readline/promises";
 
-import {Game} from './hexModel.js';
-
-await new Game(3).prompt();
+const game = new Game(5);
+const bot = new RandomBot(game);
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
+while (true) {
+    try{
+        let winningChain = await game.promptOnce(rl);
+        if (winningChain) {
+            process.exit(0);
+        }
+        winningChain = bot.play();
+        if (winningChain) {
+            console.log(winningChain.toString());
+            break;
+        }
+    } catch (e) {
+        console.log(e.message);
+        continue;
+    }
+}
 process.exit(0);
