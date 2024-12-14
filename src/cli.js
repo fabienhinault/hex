@@ -1,11 +1,11 @@
 'use strict';
 
 import {Game} from './model/hexModel.js';
-import { RawValueBot } from './model/rawValueBot.js';
+import { MinMaxBot } from './model/minMaxBot.js';
 import * as readline from "readline/promises";
 
 const game = new Game(5);
-const bot = new RawValueBot(game);
+const bot = new MinMaxBot(game);
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout
