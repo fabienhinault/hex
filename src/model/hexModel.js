@@ -1,11 +1,35 @@
 'use strict';
 
-import {range} from '../libhex.js'
+import {range, argsMin, argsMax} from '../libhex.js'
 import * as readline from "readline/promises";
 
-export let white = {value: 1, getICoord: h => h.iRow, getJCoord: h => h.iCol, prompt:'●'};
-export const black = {value: -1, getICoord: h => h.iCol, getJCoord: h => h.iRow, prompt:'\x1b[43m\x1b[30m●\x1b[0m', other: white};
+export let white = {
+    value: 1, 
+    getICoord: h => h.iRow, 
+    getJCoord: h => h.iCol, 
+    compare:  (x, y) => x < y,
+    getBestValue: (values) => Math.max(...values),
+    getArgsBest: (elements, f) => argsMax(elements, f),
+    prompt:'●', 
+    positionString: 'w'
+};
+export const black = {
+    value: -1, 
+    getICoord: h => h.iCol, 
+    getJCoord: h => h.iRow, 
+    compare:  (x, y) => x > y,
+    getBestValue: (values) => Math.min(...values),
+    getArgsBest: (elements, f) => argsMin(elements, f),
+    prompt:'\x1b[43m\x1b[30m●\x1b[0m',
+    positionString: 'b',
+    other: white
+};
 white.other = black;
+let players = [white, black];
+
+export function getLastPlayer(moves) {
+    return players[(moves.length % 2)];
+}
 
 /**
  * A Hex is a hexagonal cell of the Hex board
@@ -60,6 +84,19 @@ class Hex {
         return null;
     }
 
+    unplay() {
+        if (this.color === undefined) {
+            throw new Error('illegal unmove');
+        }
+        const exColor = this.color;
+        this.color = undefined;
+        const exChain = this.chain;
+        this.chain = undefined;
+        this.game.chains.get(exColor).delete(exChain);
+        exChain.hexes.forEach(h => h.color = undefined);
+        exChain.hexes.forEach(h => {if (h !== this) {h.play(exColor)}});
+    }
+
     getICoord() {
         return this.color.getICoord(this);
     }
@@ -88,6 +125,10 @@ class Hex {
         } else {
             return this.color.prompt;
         }
+    }
+
+    getPositionString() {
+        return this.color
     }
 }
 
@@ -147,6 +188,18 @@ class Chain {
     }
 }
 
+function getLinePositionString(line) {
+    return line.map(h => h.color?.positionString ?? ' ').join('').replaceAll(/ +/g, ss => ss.length);
+}
+
+class Clock {
+    getTime() {
+        return Date.now();
+    }
+}
+
+const clock = new Clock();
+
 export class Game {
     constructor(size) {
         this.size = size;
@@ -155,19 +208,15 @@ export class Game {
         this.chains.set(white, new Set());
         this.chains.set(black, new Set());
         this.currentColor = white;
+        this.sequence = [];
+        this.clock = clock;
     }
 
     copy() {
         let g = new Game(this.size);
-        for (let iRow = 0; iRow < this.size; iRow++) {
-            for (let iCol = 0; iCol < this.size; iCol++) {
-                let hex = this.board[iRow][iCol];
-                if (hex.color !== undefined) {
-                    g.board[iRow][iCol].play(hex.color);
-                }
-            }
+        for (let [iRow, iCol] of this.sequence) {
+            g.play(iRow, iCol);
         }
-        g.currentColor = this.currentColor;
         return g;
     }
 
@@ -175,12 +224,54 @@ export class Game {
         if (iRow < 0 || iRow >= this.size || iCol < 0 || iCol >= this.size) {
             throw new Error(`out of board ${iRow} ${iCol}`);
         }
+        this.sequence.push([iRow, iCol]);
         const winningChain = this.board[iRow][iCol].play(this.currentColor);
+        this.currentColor = this.currentColor.other;
         if (winningChain) {
             return winningChain;
-        } else {
-            this.currentColor = this.currentColor.other;
         }
+    }
+
+    after(iRow, iCol) {
+        let result = this.copy();
+        result.play(iRow, iCol);
+        return result;
+    }
+
+    unplay() {
+        if (this.sequence.length === 0) {
+            throw new Error('no move to unplay');
+        }
+        let [iRow, iCol] = this.sequence.pop();
+        if (iRow < 0 || iRow >= this.size || iCol < 0 || iCol >= this.size) {
+            throw new Error(`out of board ${iRow} ${iCol}`);
+        }
+        this.board[iRow][iCol].unplay();
+        this.currentColor = this.currentColor.other;
+    }
+
+    toOneMoveBefore() {
+        let g = new Game(this.size);
+        for (let [iRow, iCol] of this.sequence.slice(0, this.sequence.length - 1)) {
+            g.play(iRow, iCol);
+        }
+        return g;
+    }
+
+    getReverseSequence() {
+        if (this.sequence.length <= 2) {
+            return [];
+        }
+        let result = [];
+        let game = this.copy();
+        // sequence is interesting only 2 moves before.
+        game.unplay();
+        game.unplay();
+        while (game.sequence.length > 0) {
+            result.push(game);
+            game = game.toOneMoveBefore();
+        }
+        return result;
     }
 
     getNeighbourHexes(iRow, iCol) {
@@ -240,9 +331,17 @@ export class Game {
                 ).concat('\n').concat(' '.repeat(this.size)).concat('\x1b[47m').concat('  '.repeat(this.size)).concat('\x1b[0m\n');
     }
 
+    toPositionString() {
+        return this.board.map(l => getLinePositionString(l)).join('/');
+    }
+
     getRawValue() {
         return Math.max(...[...this.chains.get(white)].map(c => c.getValue())) - 
             Math.max(...[...this.chains.get(black)].map(c => c.getValue()));
+    }
+
+    getPossibleNexts() {
+        return this.board.flat().filter(h => h.color === undefined);
     }
 
 
