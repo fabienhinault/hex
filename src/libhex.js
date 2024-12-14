@@ -8,6 +8,7 @@ export function getRandomInt(min, max) {
     return Math.floor(Math.random() * (max - min) + min);
 }
 
+
 function optimum(array, f, compare, initialValue) {
     return array.reduce((acc, cur) => {
         const currentValue = f(cur);
@@ -26,11 +27,11 @@ function min(array, f) {
     return optimum(array, f, (x,y) => x < y, Number.POSITIVE_INFINITY)
 }
 
-function pick(array) {
+export function pick(array) {
     return array[getRandomInt(0, array.length)];
 }
 
-function argsMin(array, f) {
+export function argsMin(array, f) {
     return min(array, f).elements;
 }
 
@@ -42,6 +43,23 @@ function max(array, f) {
     return optimum(array, f, (x,y) => x > y, Number.NEGATIVE_INFINITY)
 }
 
-function argsMax(array, f) {
+export function argsMax(array, f) {
     return max(array, f).elements;
+}
+
+export function argsOpt(array, f, compare, initialValue) {
+    return optimum(array, f, compare, initialValue).elements;
+}
+
+export function randArgOpt(array, f, compare, initialValue) {
+    return optimum(array, f, compare, initialValue).elements;
+}
+
+export function pickWeighted(weighteds) {
+    const summedWeights = weighteds.reduce((acc, cur) => {
+        acc.push((acc[acc.length - 1] ?? 0) + cur.weight);
+        return acc;
+    }, []);
+    const r = Math.random() * summedWeights[summedWeights.length - 1];
+    return weighteds[summedWeights.findIndex(aw => aw >= r)];
 }
