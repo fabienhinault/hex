@@ -199,6 +199,9 @@ function getLinePositionString(line) {
     return line.map(h => h.color?.positionString ?? ' ').join('').replaceAll(/ +/g, ss => ss.length);
 }
 
+function getRowAscii(row, iRow) {
+    return `${" ".repeat(iRow)}${iRow + 1}  ${row.map(h => h.toAscii()).join(' ')}  ${iRow + 1}`;
+}
 class Clock {
     getTime() {
         return Date.now();
@@ -330,14 +333,15 @@ export class Game {
     }
 
     toAscii() {
-        return '\x1b[47m\x1b[30m'.concat(this.board[0].map(h => h.getColumnLetter()).join(' ')).concat('\x1b[0m\n').concat(
-                this.board.map(
-                    (row, iRow) => " ".repeat(iRow + 1)
-                        .concat(row.map(h => h.toAscii())
-                        .join(' ')
-                        .concat(`  ${iRow + 1}`))
-                    ).join('\n')
-                ).concat('\n').concat(' '.repeat(this.size)).concat('\x1b[47m').concat('  '.repeat(this.size)).concat('\x1b[0m\n');
+        return `  ${this.reversed(this.getLetters())}\n${this.board.map(getRowAscii).join('\n')}\n${' '.repeat(this.size + 3)}${this.reversed(this.getLetters())}\n`;
+    }
+
+    reversed(str) {
+        return `\x1b[47m\x1b[30m${str}\x1b[0m`;
+    }
+
+    getLetters() {
+        return this.board[0].map(h => h.getColumnLetter()).join(' ');
     }
 
     toPositionString() {
