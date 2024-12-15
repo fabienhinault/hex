@@ -36,7 +36,7 @@ export class Evaluator {
         const previousPlayer = game.currentColor.other;
         const nextPlayer = game.currentColor;
         const nexts = game.board.flat().filter(h => h.color === undefined);
-        const nextsValues = nexts.map(next => this.getSequenceValue(game.after(next.iRow, next.iCol).toPositionString()));
+        const nextsValues = nexts.map(next => this.getSequenceValue(game.after(next.iRow, next.iCol)));
         const bestValue = nextPlayer.getBestValue(nextsValues);
         const nextWin = this.WinningValue.get(nextPlayer);
         const prevWin = this.WinningValue.get(previousPlayer);
@@ -71,12 +71,12 @@ export class Evaluator {
         }
     }
 
-    getSequenceValue(positionString) {
-        const storedValue = this.sequenceValueStorage.getValue(positionString);
+    getSequenceValue(game) {
+        const storedValue = this.sequenceValueStorage.getValue(game.toPositionString());
         if (storedValue !== null && storedValue !== undefined) {
             return Number(storedValue);
         }
-        return unsure;
+        return game.getRawValue();
     }
 
 
@@ -128,8 +128,8 @@ export class Evaluator {
         }
     }
 
-    getMoveValue(nextId) {
-        return this.getSequenceValue(this.game.after(nextId.iRow, nextId.iCol).toPositionString());
+    getMoveValue(hex) {
+        return this.getSequenceValue(this.game.after(hex.iRow, hex.iCol));
     }
     
     onGameOver() {

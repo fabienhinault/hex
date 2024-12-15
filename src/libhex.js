@@ -9,7 +9,7 @@ export function getRandomInt(min, max) {
 }
 
 
-function optimum(array, f, compare, initialValue) {
+export function optimum(array, f, compare, initialValue) {
     return array.reduce((acc, cur) => {
         const currentValue = f(cur);
         if (compare(currentValue, acc.value)) {

@@ -1,29 +1,36 @@
 'use strict';
 
-import {range, argsMin, argsMax} from '../libhex.js'
+import {range, argsOpt, optimum } from '../libhex.js'
 import * as readline from "readline/promises";
 
-export let white = {
-    value: 1, 
-    getICoord: h => h.iRow, 
-    getJCoord: h => h.iCol, 
-    compare:  (x, y) => x < y,
-    getBestValue: (values) => Math.max(...values),
-    getArgsBest: (elements, f) => argsMax(elements, f),
-    prompt:'●', 
-    positionString: 'w'
-};
-export const black = {
-    value: -1, 
-    getICoord: h => h.iCol, 
-    getJCoord: h => h.iRow, 
-    compare:  (x, y) => x > y,
-    getBestValue: (values) => Math.min(...values),
-    getArgsBest: (elements, f) => argsMin(elements, f),
-    prompt:'\x1b[43m\x1b[30m●\x1b[0m',
-    positionString: 'b',
-    other: white
-};
+class Player {
+    constructor(value, getICoord, getJCoord, compare, initialValue, prompt, positionString, other) {
+        this.value = value;
+        this.getICoord = getICoord;
+        this.getJCoord = getJCoord;
+        this.initialValue = initialValue;
+        this.compare = compare;
+        this.prompt = prompt;
+        this.positionString = positionString;
+        this.other = other;
+    }
+
+    getBestValue(values) {
+        return optimum(values, x => x, this.compare, this.initialValue).value;
+    }
+
+    getArgsBest(elements, f) {
+        return argsOpt(elements, f, this.compare, this.initialValue);
+    }
+
+    attenuate(value) {
+        return value - 0.1 * this.value;
+    }
+}
+
+export let white = new Player(1, h => h.iRow, h => h.iCol, (x, y) => x > y, Number.NEGATIVE_INFINITY, '●', 'w', null);
+export const black = new Player(
+    -1, h => h.iCol, h => h.iRow, (x, y) => x < y, Number.POSITIVE_INFINITY, '\x1b[43m\x1b[30m●\x1b[0m', 'b', white);
 white.other = black;
 let players = [white, black];
 
@@ -210,6 +217,8 @@ export class Game {
         this.currentColor = white;
         this.sequence = [];
         this.clock = clock;
+        this.maxChainValue = this.size * 4;
+
     }
 
     copy() {
@@ -336,8 +345,15 @@ export class Game {
     }
 
     getRawValue() {
-        return Math.max(...[...this.chains.get(white)].map(c => c.getValue())) - 
-            Math.max(...[...this.chains.get(black)].map(c => c.getValue()));
+        const maxWhite = Math.max(...[...this.chains.get(white)].map(c => c.getValue()));
+        const maxBlack = Math.max(...[...this.chains.get(black)].map(c => c.getValue()));
+        if (maxWhite === this.maxChainValue) {
+            return maxWhite;
+        } else if (maxBlack  === this.maxChainValue) {
+            return -maxBlack;
+        } else {
+            return maxWhite - maxBlack;
+        }
     }
 
     getPossibleNexts() {

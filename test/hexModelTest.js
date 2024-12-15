@@ -111,7 +111,11 @@ describe('Hex', function () {
       evaluator.evaluateAllSubsequences();
       assert.equal(storage.getValue('wbw/wwb/bwb'), 12);
       assert.equal(storage.getValue('wbw/wwb/b1b'), 12);
-      assert.equal(storage.getValue('wbw/ww1/b1b'), 2);
+      assert.equal(storage.getValue('wbw/ww1/b1b'), -11.9);
+      assert.equal(storage.getValue('wbw/1w1/b1b'), 11.9);
+      assert.equal(storage.getValue('w1w/1w1/b1b'), -11.9);
+      assert.equal(storage.getValue('w2/1w1/b1b'), 2);
+      assert.equal(storage.getValue('w2/1w1/2b'), -2);
     });
   });
 

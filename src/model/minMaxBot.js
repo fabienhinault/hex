@@ -21,6 +21,7 @@ export class MinMaxBot {
         console.log(this.game.toAscii());
         if (this.game.getPossibleNexts().length > 0) {
             this.evaluator.evaluateNextsSync(this.game.clock.getTime() + 900);
+            console.log(this.evaluator.sequenceValueStorage.values.size);
         }
         const hexMin = this.evaluator.chooseNext();
         return this.game.play(hexMin.iRow, hexMin.iCol);
