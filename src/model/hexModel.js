@@ -26,6 +26,10 @@ class Player {
     attenuate(value) {
         return value - 0.1 * this.value;
     }
+
+    isWinning(value, size) {
+        return this.compare(value, this.value * 2 * size)
+    }
 }
 
 export let white = new Player(1, h => h.iRow, h => h.iCol, (x, y) => x > y, Number.NEGATIVE_INFINITY, '●', 'w', null);
@@ -196,12 +200,21 @@ class Chain {
 }
 
 function getLinePositionString(line) {
-    return line.map(h => h.color?.positionString ?? ' ').join('').replaceAll(/ +/g, ss => ss.length);
+    return getLongLinePositionString(line).replaceAll(/ +/g, ss => ss.length);
+}
+
+function getLongLinePositionString(line) {
+    return line.map(h => h.color?.positionString ?? ' ').join('');
 }
 
 function getRowAscii(row, iRow) {
     return `${" ".repeat(iRow)}${iRow + 1}  ${row.map(h => h.toAscii()).join(' ')}  ${iRow + 1}`;
 }
+
+function reverseString(str) {
+    return str.split('').reverse().join('');
+}
+
 class Clock {
     getTime() {
         return Date.now();
@@ -221,7 +234,7 @@ export class Game {
         this.sequence = [];
         this.clock = clock;
         this.maxChainValue = this.size * 4;
-
+        this.over = false;
     }
 
     copy() {
@@ -233,6 +246,9 @@ export class Game {
     }
 
     play(iRow, iCol) {
+        if (this.over) {
+            throw new Error('The game is over');
+        }
         if (iRow < 0 || iRow >= this.size || iCol < 0 || iCol >= this.size) {
             throw new Error(`out of board ${iRow} ${iCol}`);
         }
@@ -240,6 +256,7 @@ export class Game {
         const winningChain = this.board[iRow][iCol].play(this.currentColor);
         this.currentColor = this.currentColor.other;
         if (winningChain) {
+            this.over = true;
             return winningChain;
         }
     }
@@ -254,10 +271,8 @@ export class Game {
         if (this.sequence.length === 0) {
             throw new Error('no move to unplay');
         }
+        this.over = false;
         let [iRow, iCol] = this.sequence.pop();
-        if (iRow < 0 || iRow >= this.size || iCol < 0 || iCol >= this.size) {
-            throw new Error(`out of board ${iRow} ${iCol}`);
-        }
         this.board[iRow][iCol].unplay();
         this.currentColor = this.currentColor.other;
     }
@@ -345,10 +360,53 @@ export class Game {
     }
 
     toPositionString() {
-        return this.board.map(l => getLinePositionString(l)).join('/');
+        return this.board.map(getLinePositionString).join('/');
+    }
+
+    toPositionStrings() {
+        const longLinePositionStrings = this.board.map(getLongLinePositionString);
+        const diagSymLongLinePositionStrings = longLinePositionStrings.reduce(
+            (acc, string) => {for (let i = 0; i < this.size; i++) {acc[i] += string[i];} return acc;}, Array(this.size).fill('')
+        );
+        const linePositionStrings = longLinePositionStrings.map(ls => ls.replaceAll(/ +/g, ss => ss.length));
+        const diagSymLinePositionStrings = diagSymLongLinePositionStrings.map(ls => ls.replaceAll(/ +/g, ss => ss.length));
+        return {
+            'same': [linePositionStrings.join('/'), linePositionStrings.map(reverseString).reverse()],
+            'anti': [diagSymLinePositionStrings.join('/'), diagSymLinePositionStrings.map(reverseString).reverse()]
+        };
+    }
+
+    // symetric with respect to the main diagonal
+    toDiagSym() {
+        const result = new Game(this.size);
+        for (let m of this.sequence) {
+            result.play(m[1], m[0]);
+        }
+    }
+
+    // symetric with respect to the center of the board
+    toCentralSym() {
+        const result = new Game(this.size);
+        for (let m of this.sequence) {
+            result.play(this.size - 1 - m[0], this.size - 1 - m[1]);
+        }
+        return result;
+
+    }
+
+    // symetric with respect to the anti-diagonal
+    toAntidiagSym() {
+        const result = new Game(this.size);
+        for (let m of this.sequence) {
+            result.play(this.size - 1 - m[1], this.size - 1 - m[0]);
+        }
+        return result;
     }
 
     getRawValue() {
+        if (this.sequence.length < 2) {
+            return 0;
+        }
         const maxWhite = Math.max(...[...this.chains.get(white)].map(c => c.getValue()));
         const maxBlack = Math.max(...[...this.chains.get(black)].map(c => c.getValue()));
         if (maxWhite === this.maxChainValue) {
