@@ -1,5 +1,5 @@
 import {white, black} from './hexModel.js';
-import { pickWeighted } from '../libhex.js';
+import { pickWeighted, pick } from '../libhex.js';
 
 
 const unsure = 0;
@@ -63,10 +63,10 @@ export class Evaluator {
             if (Number.isNaN(value)) {
                 throw new Error();
             }
-            if (value !== unsure) {
+            if (Math.abs(value) > game.size) {
                 this.sequenceValueStorage.storeValue(game.toPositionString(), value);
             } else {
-                this.sequenceValueStorage.storeValue(game.toPositionString(), game.getRawValue());
+                break;
             }
         }
     }
@@ -95,29 +95,34 @@ export class Evaluator {
     }
 
     evaluateAbstract(time, f) {
-        if (!time || this.game.clock.getTime() < time) {
-            for (let next of this.game.getPossibleNexts()) {
+        const now = this.game.clock.getTime()
+        if (!time || now < time) {
+            const possibleNexts = this.game.getPossibleNexts();
+            const remainingTime = (time - now) / possibleNexts.length;
+            for (let iNext = 0; iNext < possibleNexts.length; iNext++) {
+                const next = possibleNexts[iNext];
                 const gameCopy = this.game.copy();
                 const evaluator = new Evaluator(gameCopy, this.sequenceValueStorage, this.player);
                 const winningChain = gameCopy.play(next.iRow, next.iCol);
                 if (winningChain) {
-                    evaluator.onGameOver()
+                    evaluator.evaluateAllSubsequences();
+                } else {
+                    f(evaluator, now + ((iNext + 1) * remainingTime));
                 }
-                f(evaluator, time);
             }
+        } else {
+            this.evaluateAllSubsequences();
         }
     }
 
     // choose best next move for bot
     chooseNext() {
-        const win = this.WinningValue.get(this.player);
-        const lose = this.WinningValue.get(this.player.other);
         const possibleNextsValues = this.game.getPossibleNexts().map(move => {return {move, value:this.getMoveValue(move)};});
-        const winning = possibleNextsValues.find(mv => win === mv.value);
+        const winning = possibleNextsValues.find(mv => this.player.isWinning(mv.value, this.game.size));
         if (winning) {
             return pick(this.player.getArgsBest(possibleNextsValues, _ => _.value)).move;
         }
-        const notLosings = possibleNextsValues.filter(mv => lose !== mv.value);
+        const notLosings = possibleNextsValues.filter(mv => !this.player.other.isWinning(mv.value, this.game.size));
         if (notLosings.length >= 1) {
             const weighteds = notLosings.map(_ => {
                 return {move: _.move, weight: Math.abs(_.value)};
@@ -131,11 +136,6 @@ export class Evaluator {
     getMoveValue(hex) {
         return this.getSequenceValue(this.game.after(hex.iRow, hex.iCol));
     }
-    
-    onGameOver() {
-        this.evaluateAllSubsequences();
-    }
-
 }
 
 
