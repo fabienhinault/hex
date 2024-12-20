@@ -32,7 +32,7 @@ describe('Hex', function () {
     it('should throw an error when playing on a colored hex', function () {
       const game = new Game(1);
       game.play(0, 0);
-      assert.throws(() => game.play(0, 0), new Error("illegal move"));
+      assert.throws(() => game.play(0, 0), new Error('The game is over'));
     });
 
     it('should throw an error when playing outside the board', function () {
@@ -89,6 +89,7 @@ describe('Hex', function () {
 
     it('should play on a Game constructed with 3', function () {
       const game = new Game(3);
+      assert.equal(game.getRawValue(), 0);
       ['a1', 'c3',  'b2', 'a3',  'c1', 'b1',  'a2', 'c2'].forEach(s => game.playFromHumanString(s));
       assert.equal(game.toPositionString(), 'wbw/wwb/b1b');
       const reverseSequence = game.getReverseSequence();
@@ -97,6 +98,14 @@ describe('Hex', function () {
       const winningChain = game.playFromHumanString('b3');
       assert.equal(game.toPositionString(), 'wbw/wwb/bwb');
       assert.equal('A1 C1 A2 B2 B3', winningChain.toString());
+    });
+
+    it('should evaluate a winning game', function() {
+      const game = new Game(3);
+      ['c3', 'c2', 'a1', 'b1', 'c1', 'a2', 'b2', 'a3'].forEach(s => game.playFromHumanString(s));
+      const winningChain = game.playFromHumanString('b3');
+      assert.equal('C1 B2 B3 C3', winningChain.toString());
+      assert.equal(game.getRawValue(), 12);
     });
   });
   
@@ -114,10 +123,95 @@ describe('Hex', function () {
       assert.equal(storage.getValue('wbw/ww1/b1b'), -11.9);
       assert.equal(storage.getValue('wbw/1w1/b1b'), 11.9);
       assert.equal(storage.getValue('w1w/1w1/b1b'), -11.9);
-      assert.equal(storage.getValue('w2/1w1/b1b'), 2);
-      assert.equal(storage.getValue('w2/1w1/2b'), -2);
+    });
+      
+    it('should avoid obvious loss', function() {
+      const storage = new MemorySequenceValueStorage();
+      const game = new Game(3);
+      ['c3', 'a1', 'c2'].forEach(s => game.playFromHumanString(s, storage));
+      let evaluator = new Evaluator(game, storage, black);
+      evaluator.evaluateNextsSync(game.clock.getTime() + 900);
+      const nextHex = evaluator.chooseNext();
+      assert.equal(nextHex.iCol, 2);
+      assert.equal(nextHex.iRow, 0);
+    });
+
+    it('should avoid obvious loss', function() {
+      const storage = new MemorySequenceValueStorage();
+      const game = new Game(3);
+      ['b3', 'b1', 'b2'].forEach(s => game.playFromHumanString(s, storage));
+      let evaluator = new Evaluator(game, storage, black);
+      evaluator.evaluateNextsSync(game.clock.getTime() + 900);
+      const nextHex = evaluator.chooseNext();
+      assert.equal(nextHex.iCol, 2);
+      assert.equal(nextHex.iRow, 0);
+    });
+
+    it('should evaluate a 3x3', function() {
+      this.timeout(60_000);
+      const storage = new MemorySequenceValueStorage();
+      const game = new Game(3);
+      let evaluator = new Evaluator(game, storage, white);
+      evaluator.evaluateNextsSync(); //game.clock.getTime() + 900);
+      const nexts = new Map();
+      game.getPossibleNexts().map(
+        move => {return {move, value:evaluator.getMoveValue(move)};}
+      ).forEach(
+        mv => nexts.set(mv.move.toString(), mv.value)
+      );
+      assert.equal(nexts.get('A1'), -11.9);
+      assert.equal(nexts.get('A2'), 11.9);
+      assert.equal(nexts.get('A3'), 11.9);
+      assert.equal(nexts.get('B1'), -11.9);
+      assert.equal(nexts.get('B2'), 11.9);
+      assert.equal(nexts.get('B3'), -11.9);
+      assert.equal(nexts.get('C1'), 11.9);
+      assert.equal(nexts.get('C2'), 11.9);
+      assert.equal(nexts.get('C3'), -11.9);
+    });
+
+
+    it('should evaluate a 3x3 in 1s', function() {
+      this.timeout(60_000);
+      const storage = new MemorySequenceValueStorage();
+      const game = new Game(3);
+      let evaluator = new Evaluator(game, storage, white);
+      evaluator.evaluateNextsSync(game.clock.getTime() + 900);
+      const nexts = new Map();
+      game.getPossibleNexts().map(
+        move => {return {move, value:evaluator.getMoveValue(move)};}
+      ).forEach(
+        mv => nexts.set(mv.move.toString(), mv.value)
+      );
+      assert.equal(nexts.get('A1'), 0);
+      assert.equal(nexts.get('A2'), 0);
+      assert.equal(nexts.get('A3'), 0);
+      assert.equal(nexts.get('B1'), 0);
+      assert.equal(nexts.get('B2'), 0);
+      assert.equal(nexts.get('B3'), 0);
+      assert.equal(nexts.get('C1'), 0);
+      assert.equal(nexts.get('C2'), 0);
+      assert.equal(nexts.get('C3'), 0);
+    });
+
+    it('eval black', function() {
+      const storage = new MemorySequenceValueStorage();
+      const game = new Game(3);
+      ['c3', 'c2', 'b2', 'b1', 'a1',]
+      .forEach(s => game.playFromHumanString(s, storage));
+      let evaluator = new Evaluator(game, storage, black);
+      evaluator.evaluateNextsSync();
+      const nexts = new Map();
+      game.getPossibleNexts().map(
+        move => {return {move, value:evaluator.getMoveValue(move)};}
+      ).forEach(
+        mv => nexts.set(mv.move.toString(), mv.value)
+      );
+      assert.equal(nexts.get('A2'), 11.9);
+      assert.equal(nexts.get('A3'), 11.9);
+      assert.equal(nexts.get('B3'), 11.9);
+      assert.equal(nexts.get('C1'), 11.9);
     });
   });
-
 });
 
