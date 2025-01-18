@@ -8,7 +8,7 @@ import {black} from './hexModel.js';
 export class MinMaxBot {
     constructor(game) {
         this.game = game;
-        this.evaluator = new Evaluator(game, new MemorySequenceValueStorage, black);
+        this.evaluator = new Evaluator(game, new MemorySequenceValueStorage(game.size), black);
     }
 
     getMoveValue(hex) {
@@ -18,7 +18,7 @@ export class MinMaxBot {
     }
 
     play() {
-        console.log(this.game.toAscii());
+        console.log(this.game.getPrompt(new Colo));
         if (this.game.getPossibleNexts().length > 0) {
             this.evaluator.evaluateNextsSync(this.game.clock.getTime() + 900);
             console.log(this.evaluator.sequenceValueStorage.values.size);

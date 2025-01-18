@@ -63,3 +63,17 @@ export function pickWeighted(weighteds) {
     const r = Math.random() * summedWeights[summedWeights.length - 1];
     return weighteds[summedWeights.findIndex(aw => aw >= r)];
 }
+
+export function partition(array, isValid) {
+    return array.reduce(
+        ([pass, fail], elem) => {
+            if (isValid(elem)) {
+                pass.push(elem);
+            } else {
+                fail.push(elem);
+            }
+            return [pass, fail];
+        }, 
+        [[], []]
+    );
+}

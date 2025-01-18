@@ -130,11 +130,11 @@ class Hex {
         }
     }
 
-    toAscii() {
+    getPrompt(prompter) {
         if (this.color === undefined) {
-            return '_';
+            return '·';
         } else {
-            return this.color.prompt;
+            return prompter.prompt(this.color);
         }
     }
 
@@ -200,19 +200,28 @@ class Chain {
 }
 
 function getLinePositionString(line) {
-    return getLongLinePositionString(line).replaceAll(/ +/g, ss => ss.length);
+    return getLongLinePositionString(line).replaceAll(/ +/g, spaces => spaces.length);
 }
 
 function getLongLinePositionString(line) {
     return line.map(h => h.color?.positionString ?? ' ').join('');
 }
 
-function getRowAscii(row, iRow) {
-    return `${" ".repeat(iRow)}${iRow + 1}  ${row.map(h => h.toAscii()).join(' ')}  ${iRow + 1}`;
+function getRowPrompt(row, iRow, prompter) {
+    return `${" ".repeat(iRow)}${iRow + 1}  ${row.map(h => h.getPrompt(prompter)).join(' ')}  ${iRow + 1}`;
 }
 
 function reverseString(str) {
     return str.split('').reverse().join('');
+}
+
+export function reversePositionString(position) {
+    const re = /w|b|[0-9]+|\//g
+    return [... position.matchAll(re)].reverse().join('');
+}
+
+function isPositionStringCanonical(str) {
+    return str.localeCompare(reversePositionString(str)) > 0;
 }
 
 class Clock {
@@ -265,6 +274,10 @@ export class Game {
         let result = this.copy();
         result.play(iRow, iCol);
         return result;
+    }
+
+    afterHex(hex) {
+        return this.after(hex.iRow, hex.iCol);
     }
 
     unplay() {
@@ -338,17 +351,26 @@ export class Game {
     }
 
     async promptOnce(rl) {
-        const input = await rl.question(`${this.toAscii()}\n${this.currentColor.prompt}:`);
+        const colored = new ColoredPrompter();
+        const input = await rl.question(`${this.getPrompt(colored)}\n${this.currentColor.prompt}:`);
         const winningChain = this.playFromHumanString(input);
         if (winningChain) {
-            console.log(this.toAscii());
+            console.log(this.getPrompt(colored));
             console.log(winningChain.toString());
         }
         return winningChain;
     }
 
-    toAscii() {
-        return `  ${this.reversed(this.getLetters())}\n${this.board.map(getRowAscii).join('\n')}\n${' '.repeat(this.size + 3)}${this.reversed(this.getLetters())}\n`;
+    getAbstractPrompt(prompter) {
+        return `  ${prompter.reverse(this.getLetters())}\n${this.board.map((row, iRow) => getRowPrompt(row, iRow, prompter)).join('\n')}\n${' '.repeat(this.size + 3)}${prompter.reverse(this.getLetters())}\n`;
+    }
+
+    getPrompt() {
+        return this.getAbstractPrompt(new ColoredPrompter());
+    }
+
+    getMonochromePrompt() {
+        return this.getAbstractPrompt(new MonochromePrompter());
     }
 
     reversed(str) {
@@ -364,16 +386,23 @@ export class Game {
     }
 
     toPositionStrings() {
-        const longLinePositionStrings = this.board.map(getLongLinePositionString);
-        const diagSymLongLinePositionStrings = longLinePositionStrings.reduce(
-            (acc, string) => {for (let i = 0; i < this.size; i++) {acc[i] += string[i];} return acc;}, Array(this.size).fill('')
-        );
-        const linePositionStrings = longLinePositionStrings.map(ls => ls.replaceAll(/ +/g, ss => ss.length));
-        const diagSymLinePositionStrings = diagSymLongLinePositionStrings.map(ls => ls.replaceAll(/ +/g, ss => ss.length));
-        return {
-            'same': [linePositionStrings.join('/'), linePositionStrings.map(reverseString).reverse()],
-            'anti': [diagSymLinePositionStrings.join('/'), diagSymLinePositionStrings.map(reverseString).reverse()]
-        };
+        const positionString = this.toPositionString();
+        const reversed = reversePositionString(positionString);
+        if (positionString === reversed) {
+            return [positionString];
+        } else {
+            return [positionString, reversed];
+        }
+    }
+
+    getCanonicalPositionString() {
+        const positionString = this.toPositionString();
+        const reversed = reversePositionString(positionString);
+        if (positionString.localeCompare(reversed) > 0) {
+            return positionString;
+        } else {
+            return reversed;
+        }
     }
 
     // symetric with respect to the main diagonal
@@ -419,8 +448,36 @@ export class Game {
     }
 
     getPossibleNexts() {
-        return this.board.flat().filter(h => h.color === undefined);
+        if (this.over) {
+            return [];
+        } else {
+            return this.board.flat().filter(h => h.color === undefined);
+        }
     }
 
+    isWinning() {
+        return [...this.chains.get(this.currentColor.other).values()].some(c => c.isWinning);
+    }
 
+}
+
+class MonochromePrompter {
+    prompt(player) {
+        return player.positionString;
+    }
+
+    reverse(str) {
+        // do not reverse at all
+        return str;
+    }
+}
+
+class ColoredPrompter {
+    prompt(player) {
+        return player.prompt;
+    }
+    
+    reverse(str) {
+        return `\x1b[47m\x1b[30m${str}\x1b[0m`;
+    }
 }

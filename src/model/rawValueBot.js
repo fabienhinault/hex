@@ -14,7 +14,7 @@ export class RawValueBot {
     }
 
     play() {
-        console.log(this.game.toAscii());
+        console.log(this.game.getPrompt());
         const hexMin = randArgMin(this.game.board.flat().filter(h => h.color === undefined), getMoveValue);
         return this.game.play(hexMin.iRow, hexMin.iCol);
     }

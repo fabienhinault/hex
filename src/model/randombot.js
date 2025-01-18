@@ -9,7 +9,7 @@ export class RandomBot {
     }
 
     play() {
-        console.log(this.game.toAscii());
+        console.log(this.game.getPrompt());
         let iRow = getRandomInt(0, this.game.size);
         let iCol = getRandomInt(0, this.game.size);
         while (true) {

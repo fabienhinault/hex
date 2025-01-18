@@ -1,9 +1,15 @@
 import { strict as assert } from 'assert';
-import {Game, white, black} from '../src/model/hexModel.js';
+import {Game, white, black, reversePositionString} from '../src/model/hexModel.js';
 import {Evaluator, MemorySequenceValueStorage} from '../src/model/evaluator.js';
 
 
 describe('Hex', function () {
+  describe('Position String', function () {
+    it('should reverse a position string with 2 digit numbers', function () {
+      assert.equal(reversePositionString('10/10/10/10/10/10/10/10/10/1w2b5'), '5b2w1/10/10/10/10/10/10/10/10/10');
+    });
+  });
+
   describe('Game', function () {
     it('should construct a Game', function () {
       assert.doesNotThrow(() => new Game(1));
@@ -111,8 +117,8 @@ describe('Hex', function () {
   
   describe('Evaluator', function() {
     it('should evaluate a winning game', function() {
-      const storage = new MemorySequenceValueStorage();
       const game = new Game(3);
+      const storage = new MemorySequenceValueStorage(3);
       ['a1', 'c3', 'b2', 'a3', 'c1', 'b1', 'a2', 'c2'].forEach(s => game.playFromHumanString(s, storage));
       const winningChain = game.playFromHumanString('b3', storage);
       assert.equal('A1 C1 A2 B2 B3', winningChain.toString());
@@ -126,22 +132,22 @@ describe('Hex', function () {
     });
       
     it('should avoid obvious loss', function() {
-      const storage = new MemorySequenceValueStorage();
       const game = new Game(3);
+      const storage = new MemorySequenceValueStorage(3);
       ['c3', 'a1', 'c2'].forEach(s => game.playFromHumanString(s, storage));
       let evaluator = new Evaluator(game, storage, black);
-      evaluator.evaluateNextsSync(game.clock.getTime() + 900);
+      evaluator.evaluateNextsSync(evaluator, game.clock.getTime() + 900);
       const nextHex = evaluator.chooseNext();
       assert.equal(nextHex.iCol, 2);
       assert.equal(nextHex.iRow, 0);
     });
 
-    it('should avoid obvious loss', function() {
-      const storage = new MemorySequenceValueStorage();
+    it('should avoid other obvious loss', function() {
       const game = new Game(3);
+      const storage = new MemorySequenceValueStorage(3);
       ['b3', 'b1', 'b2'].forEach(s => game.playFromHumanString(s, storage));
       let evaluator = new Evaluator(game, storage, black);
-      evaluator.evaluateNextsSync(game.clock.getTime() + 900);
+      evaluator.evaluateNextsSync(evaluator, game.clock.getTime() + 900);
       const nextHex = evaluator.chooseNext();
       assert.equal(nextHex.iCol, 2);
       assert.equal(nextHex.iRow, 0);
@@ -149,10 +155,10 @@ describe('Hex', function () {
 
     it('should evaluate a 3x3', function() {
       this.timeout(60_000);
-      const storage = new MemorySequenceValueStorage();
       const game = new Game(3);
+      const storage = new MemorySequenceValueStorage(3);
       let evaluator = new Evaluator(game, storage, white);
-      evaluator.evaluateNextsSync(); //game.clock.getTime() + 900);
+      evaluator.evaluateNextsSync(evaluator); //game.clock.getTime() + 900);
       const nexts = new Map();
       game.getPossibleNexts().map(
         move => {return {move, value:evaluator.getMoveValue(move)};}
@@ -172,11 +178,10 @@ describe('Hex', function () {
 
 
     it('should evaluate a 3x3 in 1s', function() {
-      this.timeout(60_000);
-      const storage = new MemorySequenceValueStorage();
       const game = new Game(3);
+      const storage = new MemorySequenceValueStorage(3);
       let evaluator = new Evaluator(game, storage, white);
-      evaluator.evaluateNextsSync(game.clock.getTime() + 900);
+      evaluator.evaluateNextsSync(evaluator, game.clock.getTime() + 900);
       const nexts = new Map();
       game.getPossibleNexts().map(
         move => {return {move, value:evaluator.getMoveValue(move)};}
@@ -195,12 +200,12 @@ describe('Hex', function () {
     });
 
     it('eval black', function() {
-      const storage = new MemorySequenceValueStorage();
       const game = new Game(3);
+      const storage = new MemorySequenceValueStorage(3);
       ['c3', 'c2', 'b2', 'b1', 'a1',]
       .forEach(s => game.playFromHumanString(s, storage));
       let evaluator = new Evaluator(game, storage, black);
-      evaluator.evaluateNextsSync();
+      evaluator.evaluateNextsSync(evaluator);
       const nexts = new Map();
       game.getPossibleNexts().map(
         move => {return {move, value:evaluator.getMoveValue(move)};}
