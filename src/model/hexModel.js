@@ -36,7 +36,7 @@ export let white = new Player(1, h => h.iRow, h => h.iCol, (x, y) => x > y, Numb
 export const black = new Player(
     -1, h => h.iCol, h => h.iRow, (x, y) => x < y, Number.POSITIVE_INFINITY, '\x1b[43m\x1b[30m●\x1b[0m', 'b', white);
 white.other = black;
-let players = [white, black];
+export let players = [white, black];
 
 export function getLastPlayer(moves) {
     return players[(moves.length % 2)];

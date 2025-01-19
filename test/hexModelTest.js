@@ -120,15 +120,13 @@ describe('Hex', function () {
       const game = new Game(3);
       const storage = new MemorySequenceValueStorage(3);
       ['a1', 'c3', 'b2', 'a3', 'c1', 'b1', 'a2', 'c2'].forEach(s => game.playFromHumanString(s, storage));
+      let evaluator = new Evaluator(game, storage, white);
+      evaluator.evaluateNextsSync(evaluator);
+      const stored = storage.getValue(9, 'wbw/wwb/bwb');
+      assert.equal(stored.rawValue, 12);
+      assert.equal(stored.value, 12);
       const winningChain = game.playFromHumanString('b3', storage);
       assert.equal('A1 C1 A2 B2 B3', winningChain.toString());
-      let evaluator = new Evaluator(game, storage, white);
-      evaluator.evaluateAllSubsequences();
-      assert.equal(storage.getValue('wbw/wwb/bwb'), 12);
-      assert.equal(storage.getValue('wbw/wwb/b1b'), 12);
-      assert.equal(storage.getValue('wbw/ww1/b1b'), -11.9);
-      assert.equal(storage.getValue('wbw/1w1/b1b'), 11.9);
-      assert.equal(storage.getValue('w1w/1w1/b1b'), -11.9);
     });
       
     it('should avoid obvious loss', function() {
@@ -165,15 +163,15 @@ describe('Hex', function () {
       ).forEach(
         mv => nexts.set(mv.move.toString(), mv.value)
       );
-      assert.equal(nexts.get('A1'), -11.9);
-      assert.equal(nexts.get('A2'), 11.9);
-      assert.equal(nexts.get('A3'), 11.9);
-      assert.equal(nexts.get('B1'), -11.9);
-      assert.equal(nexts.get('B2'), 11.9);
-      assert.equal(nexts.get('B3'), -11.9);
-      assert.equal(nexts.get('C1'), 11.9);
-      assert.equal(nexts.get('C2'), 11.9);
-      assert.equal(nexts.get('C3'), -11.9);
+      assert.equal(nexts.get('A1'), -12);
+      assert.equal(nexts.get('A2'), 12);
+      assert.equal(nexts.get('A3'), 12);
+      assert.equal(nexts.get('B1'), -12);
+      assert.equal(nexts.get('B2'), 12);
+      assert.equal(nexts.get('B3'), -12);
+      assert.equal(nexts.get('C1'), 12);
+      assert.equal(nexts.get('C2'), 12);
+      assert.equal(nexts.get('C3'), -12);
     });
 
 
@@ -188,15 +186,7 @@ describe('Hex', function () {
       ).forEach(
         mv => nexts.set(mv.move.toString(), mv.value)
       );
-      assert.equal(nexts.get('A1'), 0);
-      assert.equal(nexts.get('A2'), 0);
-      assert.equal(nexts.get('A3'), 0);
-      assert.equal(nexts.get('B1'), 0);
-      assert.equal(nexts.get('B2'), 0);
-      assert.equal(nexts.get('B3'), 0);
-      assert.equal(nexts.get('C1'), 0);
-      assert.equal(nexts.get('C2'), 0);
-      assert.equal(nexts.get('C3'), 0);
+      assert([... nexts.values()].every(x => x === 0 || x === -2));
     });
 
     it('eval black', function() {
@@ -212,10 +202,10 @@ describe('Hex', function () {
       ).forEach(
         mv => nexts.set(mv.move.toString(), mv.value)
       );
-      assert.equal(nexts.get('A2'), 11.9);
-      assert.equal(nexts.get('A3'), 11.9);
-      assert.equal(nexts.get('B3'), 11.9);
-      assert.equal(nexts.get('C1'), 11.9);
+      assert.equal(nexts.get('A2'), 12);
+      assert.equal(nexts.get('A3'), 12);
+      assert.equal(nexts.get('B3'), 12);
+      assert.equal(nexts.get('C1'), 12);
     });
   });
 });

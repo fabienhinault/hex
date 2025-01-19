@@ -1,4 +1,4 @@
-import {white, black} from './hexModel.js';
+import {white, black, players} from './hexModel.js';
 import { pickWeighted, pick } from '../libhex.js';
 
 
@@ -29,58 +29,19 @@ export class Evaluator {
         this.done = false;
     }
 
-    /* The value of a sequence says if the sequence is winning for firstPlayer or secondPlayer.
+    /* The value of a position says if the position is winning for firstPlayer or secondPlayer.
      * It is winning for firstPlayer if the value is close to firstPlayerValue, and same for secondPlayer.
-     * The value of the sequence depends on the value of its successors.
+     * The value of the position depends on the value of its successors.
      * All players are considered good. If a winning move exists, the evaluation supposes she will take it.
      */
-    evaluateSequence(game) {
-        // player who just played last move
-        const previousPlayer = game.currentColor.other;
-        const nextPlayer = game.currentColor;
-        const nexts = game.board.flat().filter(h => h.color === undefined);
-        const nextsValues = nexts.map(next => this.getSequenceValue(game.after(next.iRow, next.iCol)));
-        const bestValue = nextPlayer.getBestValue(nextsValues);
-        const nextWin = this.WinningValue.get(nextPlayer);
-        const prevWin = this.WinningValue.get(previousPlayer);
-        if (bestValue === nextWin) {
-            // the current sequence is considered winning for nextPlayer.
-            // attenuated for the possible losing moves, and the distance.
-            return checkNotNan(nextPlayer.attenuate(bestValue, nextsValues.filter(v => v !== nextWin).length + 1));
-        }
-        if (bestValue === prevWin) {
-            return checkNotNan(previousPlayer.attenuate(bestValue, nextsValues.filter(v => v !== prevWin).length + 1));
-        }
-        return checkNotNan(bestValue);
-    }
-
-    evaluateAllSubsequences() {
-        const lastPlayerValue = this.game.getRawValue();
-        this.sequenceValueStorage.storeValue(this.game.toPositionString(), lastPlayerValue);
-        if (this.game.sequence.length > 0) {
-            const oneMoveBefore = this.game.toOneMoveBefore();
-            this.sequenceValueStorage.storeValue(oneMoveBefore.toPositionString(), lastPlayerValue);
-        }
-        for (let game of this.game.getReverseSequence()) {
-            const value = this.evaluateSequence(game);
-            if (Number.isNaN(value)) {
-                throw new Error();
-            }
-            if (Math.abs(value) > game.size) {
-                this.sequenceValueStorage.storeValue(game.toPositionString(), value);
-            } else {
-                break;
-            }
-        }
-    }
-
     evaluateBack(length, stored) {
-        const previousPlayer = players[length % 2];
-        const nextPlayer = previousPlayer.other;
+        const nextPlayer = players[length % 2];
         const nextStoreds = stored.nexts.map(n => this.sequenceValueStorage.getValue(length + 1, n));
-        const nextValues = nextStoreds.map(s => s.value ?? s.rawValue)
-        const bestValue = nextPlayer.getBestValue(nextsValues);
-        stored.value = bestValue;
+        const nextValues = nextStoreds.filter(s => s !== undefined).map(s => s.value ?? s.rawValue);
+        if (nextValues.length === 0) {
+            return stored.rawValue;
+        }
+        return nextPlayer.getBestValue(nextValues);
     }
 
     evaluateBackAll(length) {
@@ -88,37 +49,53 @@ export class Evaluator {
             this.done = true;
             for (let len = length; len > this.game.sequence.length - 1; len--) {
                 const map = this.sequenceValueStorage.getMap(len);
-                for (stored of map.values) {
-                    stored.value = this.evaluateBackAll(len, stored);
+                for (let stored of map.values()) {
+                    if (stored.value === undefined) {
+                        stored.value = this.evaluateBack(len, stored);
+                    }
                 }
             }
         }
     }
 
-    getSequenceValue(game) {
-        const storedValue = this.sequenceValueStorage.getValue(game.toPositionString());
+    getPositionValue(game) {
+        const storedValue = this.sequenceValueStorage.getValue(game.sequence.length, game.getCanonicalPositionString());
         if (storedValue !== null && storedValue !== undefined) {
-            return Number(storedValue);
+            return Number(storedValue.value ?? storedValue.rawValue);
         }
         return game.getRawValue();
     }
 
-
     evaluateNexts(initiator, time) {
-        this.evaluateAbstract(initiator, time, (evaluator, t) => {
+        this.evaluateNextsRec(initiator, time);
+        if (!this.done) {
+            const size = this.game.size;
+            this.evaluateBackAll(size * size);
+        }
+    }
+
+    evaluateNextsRec(initiator, time) {
+        this.evaluateAbstractRec(initiator, time, (evaluator, t) => {
             setTimeout(() => {
-                evaluator.evaluateNexts(initiator, t);
+                evaluator.evaluateNextsRec(initiator, t);
             }, 0);
         });
     }
 
     evaluateNextsSync(initiator, time) {
-        this.evaluateAbstract(initiator, time, (evaluator, t) => {
-            evaluator.evaluateNextsSync(initiator, t);
+        this.evaluateNextsSyncRec(initiator, time);
+        if (!this.done) {
+            const size = this.game.size;
+            this.evaluateBackAll(size * size);
+        }
+    }
+    evaluateNextsSyncRec(initiator, time) {
+        this.evaluateAbstractRec(initiator, time, (evaluator, t) => {
+            evaluator.evaluateNextsSyncRec(initiator, t);
         });
     }
 
-    evaluateAbstract(initiator, time, f) {
+    evaluateAbstractRec(initiator, time, f) {
         const positionString = this.game.getCanonicalPositionString();
         const length = this.game.sequence.length;
         if (this.sequenceValueStorage.getValue(length, positionString) !== undefined) {
@@ -153,12 +130,13 @@ export class Evaluator {
     }
 
     storeWinningGame(gameCopy) {
+        const rawValue = gameCopy.getRawValue();
         this.sequenceValueStorage.storeValue(
             gameCopy.sequence.length,
             gameCopy.getCanonicalPositionString(),
             {
-                rawValue: this.game.getRawValue(),
-                value: this.game.getRawValue(),
+                rawValue,
+                value: rawValue,
                 nexts: []
             }
         );
@@ -183,14 +161,14 @@ export class Evaluator {
     }
 
     getMoveValue(hex) {
-        return this.getSequenceValue(this.game.after(hex.iRow, hex.iCol));
+        return this.getPositionValue(this.game.after(hex.iRow, hex.iCol));
     }
 }
 
 
 export class MemorySequenceValueStorage {
     constructor(size) {
-        this.values = new Array(size * size).fill(0).map(x => new Map());
+        this.values = new Array(size * size + 1).fill(0).map(x => new Map());
     }
     storeValue(length, positionString, value) {
         this.values[length].set(positionString, value);

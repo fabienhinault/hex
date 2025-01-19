@@ -18,7 +18,7 @@ export class MinMaxBot {
     }
 
     play() {
-        console.log(this.game.getPrompt(new Colo));
+        console.log(this.game.getPrompt());
         if (this.game.getPossibleNexts().length > 0) {
             this.evaluator.evaluateNextsSync(this.game.clock.getTime() + 900);
             console.log(this.evaluator.sequenceValueStorage.values.size);
