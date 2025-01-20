@@ -10,6 +10,27 @@ describe('Hex', function () {
     });
   });
 
+  describe('Chain', function () {
+    it('should find coord neighbours', function () {
+      const game = new Game(3);
+      game.playFromHumanString('b2');
+      const whiteChain = game.chains.get(white).values().next().value;
+      const ils = whiteChain.getFreeICoordLowNeighbours();
+      assert.equal(ils.length, 2);
+      assert.deepEqual(ils.map(h => [h.iRow, h.iCol]), [[0, 1], [0, 2]]);
+      const ihs = whiteChain.getFreeICoordHighNeighbours();
+      assert.equal(ihs.length, 2);
+      assert.deepEqual(ihs.map(h => [h.iRow, h.iCol]), [[2, 0], [2, 1]]);
+      const js = whiteChain.getFreeJCoordNeighbours();
+      assert.equal(js.length, 2);
+      assert.deepEqual(js.map(h => [h.iRow, h.iCol]), [[1, 0], [1, 2]]);
+      assert.equal(game.getPossibleNexts().length, 8);
+      game.playFromHumanString('a2');
+      const expected = ['B1', 'C1', 'A3', 'B3', 'C2', 'A1', 'C3'];
+      game.getPossibleNexts().map(h => h.toString()).forEach((actual, i) => assert.equal(actual, expected[i]));
+    });
+  });
+
   describe('Game', function () {
     it('should construct a Game', function () {
       assert.doesNotThrow(() => new Game(1));
