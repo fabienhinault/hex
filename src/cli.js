@@ -18,6 +18,7 @@ while (true) {
         }
         winningChain = bot.play();
         if (winningChain) {
+            console.log(game.getPrompt());
             console.log(winningChain.toString());
             break;
         }
