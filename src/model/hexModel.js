@@ -4,10 +4,11 @@ import {range, argsOpt, optimum } from '../libhex.js'
 import * as readline from "readline/promises";
 
 class Player {
-    constructor(value, getICoord, getJCoord, compare, initialValue, prompt, positionString, other) {
+    constructor(value, getICoord, getJCoord, getIJHex, compare, initialValue, prompt, positionString, other) {
         this.value = value;
         this.getICoord = getICoord;
         this.getJCoord = getJCoord;
+        this.getIJHex = getIJHex;
         this.initialValue = initialValue;
         this.compare = compare;
         this.prompt = prompt;
@@ -32,9 +33,9 @@ class Player {
     }
 }
 
-export let white = new Player(1, h => h.iRow, h => h.iCol, (x, y) => x > y, Number.NEGATIVE_INFINITY, '●', 'w', null);
+export let white = new Player(1, h => h.iRow, h => h.iCol, (board, i, j) => board[i][j], (x, y) => x > y, Number.NEGATIVE_INFINITY, '●', 'w', null);
 export const black = new Player(
-    -1, h => h.iCol, h => h.iRow, (x, y) => x < y, Number.POSITIVE_INFINITY, '\x1b[43m\x1b[30m●\x1b[0m', 'b', white);
+    -1, h => h.iCol, h => h.iRow, (x, y) => x < y, (board, i, j) => board[j][i], Number.POSITIVE_INFINITY, '\x1b[43m\x1b[30m●\x1b[0m', 'b', white);
 white.other = black;
 export let players = [white, black];
 
@@ -110,6 +111,10 @@ class Hex {
 
     getICoord() {
         return this.color.getICoord(this);
+    }
+
+    getJCoord() {
+        return this.color.getJCoord(this);
     }
 
     toString() {
@@ -196,6 +201,96 @@ class Chain {
             value *= 2;
         }
         return value;
+    }
+
+    pushIfFree(i, j, result) {
+        if (j >= this.game.size) {
+            return;
+        }
+        const hex = this.getColor().getIJHex(this.game.board, i, j);
+        if (hex.color === undefined) {
+            result.push(hex);
+        }
+    }
+
+    getFreeICoordLowNeighbours() {
+        const extremeHexesJcoords = this.hexes.filter(h => h.getICoord() === this.minICoord).map(h => this.getColor().getJCoord(h));
+        extremeHexesJcoords.sort((a, b) => a - b);
+        const result = [];
+        let jPrev = -2;
+        for (let j of extremeHexesJcoords) {
+            if (j - jPrev > 1) {
+                this.pushIfFree(this.minICoord - 1, j, result);
+            }
+            this.pushIfFree(this.minICoord - 1, j + 1, result);
+        }
+        return result;
+    }
+
+    getFreeICoordHighNeighbours() {
+        const extremeHexesJcoords = this.hexes.filter(h => h.getICoord() === this.maxICoord).map(h => this.getColor().getJCoord(h));
+        extremeHexesJcoords.sort((a, b) => a - b);
+        const result = [];
+        let jPrev = -2;
+        for (let j of extremeHexesJcoords) {
+            if (j - jPrev > 1) {
+                this.pushIfFree(this.maxICoord + 1, j - 1, result);
+            }
+            this.pushIfFree(this.maxICoord + 1, j, result);
+        }
+        return result;
+    }
+
+    getFreeICoordPartialNeighbours(extremeICoord, newExtremeICoord) {
+        const extremeHexesJcoords = this.hexes.filter(h => h.getICoord() === extremeICoord).map(h => this.getColor().getJCoord(h));
+        extremeHexesJcoords.sort((a, b) => a - b);
+        const result = [];
+        let jPrev = -2;
+        for (let j of extremeHexesJcoords) {
+            if (j - jPrev > 1) {
+                this.pushIfFree(newExtremeICoord, j, result);
+            }
+            this.pushIfFree(newExtremeICoord, j + 1, result);
+        }
+        return result;
+    }
+
+    getFreeICoordNeighbours() {
+        const result = [];
+        if (! this.isTouchingLow) {
+            this.getFreeICoordLowNeighbours().forEach(h => result.push(h));
+        }
+        if (! this.isTouchingHigh) {
+            this.getFreeICoordHighNeighbours().forEach(h => result.push(h));
+        }
+        return result;
+    }
+
+    addIfFree(i, j, set) {
+        if (j < 0 || j >= this.game.size) {
+            return;
+        }
+        const hex = this.getColor().getIJHex(this.game.board, i, j);
+        if (hex.color === undefined) {
+            set.add(hex);
+        }
+    }
+
+    getFreeJCoordNeighbours() {
+        const sets = new Array(this.maxICoord + 1).fill(0).map(z => new Set());
+        for (let hex of this.hexes) {
+            this.addIfFree(hex.getICoord(), hex.getJCoord() - 1, sets[hex.getICoord()]);
+            this.addIfFree(hex.getICoord(), hex.getJCoord() + 1, sets[hex.getICoord()]);
+        }
+        const result = [];
+        for (let i = this.minICoord; i <= this.maxICoord; i++) {
+            sets[i].forEach(h => result.push(h));
+        }
+        return result;
+    }
+
+    getFreeNeighbours () {
+        return this.getFreeICoordNeighbours().concat(this.getFreeJCoordNeighbours());
     }
 }
 
@@ -451,7 +546,13 @@ export class Game {
         if (this.over) {
             return [];
         } else {
-            return this.board.flat().filter(h => h.color === undefined);
+            const nexts = this.board.flat().filter(h => h.color === undefined);
+            const neighbours = [...this.chains.get(this.currentColor)]
+                .toSorted((c1, c2) => c2.hexes.length - c1.hexes.length)
+                .map(c => c.getFreeNeighbours())
+                .flat()
+                .reduce((acc, current) => {if (!acc.includes(current)) {acc.push(current); return acc;}}, []);
+            return neighbours.concat(nexts.filter(h => !neighbours.includes(h)));
         }
     }
 
