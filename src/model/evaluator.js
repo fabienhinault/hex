@@ -41,20 +41,33 @@ export class Evaluator {
         if (nextValues.length === 0) {
             return stored.rawValue;
         }
+        const bestValue = nextPlayer.getBestValue(nextValues);
+        if (nextPlayer.isWinning(bestValue)) {
+            // the current sequence is considered winning for nextPlayer.
+            // attenuated for the possible losing moves, and the distance.
+            return checkNotNan(nextPlayer.attenuate(bestValue));
+        }
+        const previousPlayer = nextPlayer.other;
+        if (previousPlayer.isWinning(bestValue)) {
+            return checkNotNan(previousPlayer.attenuate(bestValue));
+        }
         return nextPlayer.getBestValue(nextValues);
     }
 
     evaluateBackAll(length) {
         if (!this.done) {
+            console.log(`initiator.evaluateBackAll(${length})`);
+            let mapcount = 0;
             this.done = true;
             for (let len = length; len > this.game.sequence.length - 1; len--) {
                 const map = this.sequenceValueStorage.getMap(len);
                 for (let stored of map.values()) {
-                    if (stored.value === undefined) {
-                        stored.value = this.evaluateBack(len, stored);
-                    }
+                    stored.value = this.evaluateBack(len, stored);
+                    mapcount++;
                 }
             }
+            console.log(mapcount);
+            console.log(this.sequenceValueStorage.values.filter(m => m.size !== 0).length)
         }
     }
 
@@ -67,6 +80,7 @@ export class Evaluator {
     }
 
     evaluateNexts(initiator, time) {
+        this.done = false;
         this.evaluateNextsRec(initiator, time);
         if (!this.done) {
             const size = this.game.size;
@@ -83,6 +97,7 @@ export class Evaluator {
     }
 
     evaluateNextsSync(initiator, time) {
+        this.done = false;
         this.evaluateNextsSyncRec(initiator, time);
         if (!this.done) {
             const size = this.game.size;
@@ -109,15 +124,12 @@ export class Evaluator {
             for (let iNext = 0; iNext < possibleNexts.length; iNext++) {
                 const gameCopy = possibleNexts[iNext];
                 const evaluator = new Evaluator(gameCopy, this.sequenceValueStorage, this.player);
-                const over = gameCopy.over;
                 if (gameCopy.over) {
                     this.storeWinningGame(gameCopy);
                 } else {
                     f(evaluator, now + ((iNext + 1) * remainingTime));
                 }
             }
-        } else {
-            initiator.evaluateBackAll(length);
         }
     }
 
@@ -145,6 +157,7 @@ export class Evaluator {
     // choose best next move for bot
     chooseNext() {
         const possibleNextsValues = this.game.getPossibleNexts().map(move => {return {move, value:this.getMoveValue(move)};});
+        console.log(possibleNextsValues.map(o => [o.move.toString(), o.value]));
         const winning = possibleNextsValues.find(mv => this.player.isWinning(mv.value, this.game.size));
         if (winning) {
             return pick(this.player.getArgsBest(possibleNextsValues, _ => _.value)).move;
