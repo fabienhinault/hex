@@ -35,7 +35,7 @@ class Player {
 
 export let white = new Player(1, h => h.iRow, h => h.iCol, (board, i, j) => board[i][j], (x, y) => x > y, Number.NEGATIVE_INFINITY, '●', 'w', null);
 export const black = new Player(
-    -1, h => h.iCol, h => h.iRow, (x, y) => x < y, (board, i, j) => board[j][i], Number.POSITIVE_INFINITY, '\x1b[43m\x1b[30m●\x1b[0m', 'b', white);
+    -1, h => h.iCol, h => h.iRow, (board, i, j) => board[j][i], (x, y) => x < y, Number.POSITIVE_INFINITY, '\x1b[43m\x1b[30m●\x1b[0m', 'b', white);
 white.other = black;
 export let players = [white, black];
 
@@ -204,7 +204,7 @@ class Chain {
     }
 
     pushIfFree(i, j, result) {
-        if (j >= this.game.size) {
+        if (j < 0 || j >= this.game.size) {
             return;
         }
         const hex = this.getColor().getIJHex(this.game.board, i, j);
@@ -551,7 +551,7 @@ export class Game {
                 .toSorted((c1, c2) => c2.hexes.length - c1.hexes.length)
                 .map(c => c.getFreeNeighbours())
                 .flat()
-                .reduce((acc, current) => {if (!acc.includes(current)) {acc.push(current); return acc;}}, []);
+                .reduce((acc, current) => {if (!acc.includes(current)) {acc.push(current);} return acc;}, []);
             return neighbours.concat(nexts.filter(h => !neighbours.includes(h)));
         }
     }
