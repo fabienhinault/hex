@@ -56,7 +56,6 @@ export class Evaluator {
 
     evaluateBackAll(length) {
         if (!this.done) {
-            console.log(`initiator.evaluateBackAll(${length})`);
             let mapcount = 0;
             this.done = true;
             for (let len = length; len > this.game.sequence.length - 1; len--) {
@@ -79,38 +78,39 @@ export class Evaluator {
         return game.getRawValue();
     }
 
-    evaluateNexts(initiator, time) {
+    evaluateNexts(time) {
         this.done = false;
-        this.evaluateNextsRec(initiator, time);
+        this.evaluateNextsRec(time);
         if (!this.done) {
             const size = this.game.size;
             this.evaluateBackAll(size * size);
         }
     }
 
-    evaluateNextsRec(initiator, time) {
-        this.evaluateAbstractRec(initiator, time, (evaluator, t) => {
+    evaluateNextsRec(time) {
+        this.evaluateAbstractRec(time, (evaluator, t) => {
             setTimeout(() => {
-                evaluator.evaluateNextsRec(initiator, t);
+                evaluator.evaluateNextsRec(t);
             }, 0);
         });
     }
 
-    evaluateNextsSync(initiator, time) {
+    evaluateNextsSync(time) {
         this.done = false;
-        this.evaluateNextsSyncRec(initiator, time);
+        this.evaluateNextsSyncRec(time);
         if (!this.done) {
             const size = this.game.size;
             this.evaluateBackAll(size * size);
         }
     }
-    evaluateNextsSyncRec(initiator, time) {
-        this.evaluateAbstractRec(initiator, time, (evaluator, t) => {
-            evaluator.evaluateNextsSyncRec(initiator, t);
+
+    evaluateNextsSyncRec(time) {
+        this.evaluateAbstractRec(time, (evaluator, t) => {
+            evaluator.evaluateNextsSyncRec(t);
         });
     }
 
-    evaluateAbstractRec(initiator, time, f) {
+    evaluateAbstractRec(time, f) {
         const positionString = this.game.getCanonicalPositionString();
         const length = this.game.sequence.length;
         if (this.sequenceValueStorage.getValue(length, positionString) !== undefined) {
@@ -126,6 +126,8 @@ export class Evaluator {
                 const evaluator = new Evaluator(gameCopy, this.sequenceValueStorage, this.player);
                 if (gameCopy.over) {
                     this.storeWinningGame(gameCopy);
+                    this.sequenceValueStorage.getValue(this.game.sequence.length, positionString).value = gameCopy.getRawValue();
+                    break;
                 } else {
                     f(evaluator, now + ((iNext + 1) * remainingTime));
                 }
