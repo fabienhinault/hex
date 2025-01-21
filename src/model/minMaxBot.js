@@ -13,7 +13,7 @@ export class MinMaxBot {
     play() {
         console.log(this.game.getPrompt());
         if (this.game.getPossibleNexts().length > 0) {
-            this.evaluator.evaluateNextsSync(this.evaluator, this.game.clock.getTime() + 1800);
+            this.evaluator.evaluateNextsSync(this.game.clock.getTime() + 1800);
         }
         const hexMin = this.evaluator.chooseNext();
         return this.game.play(hexMin.iRow, hexMin.iCol);
