@@ -1,4 +1,4 @@
-import { strict as assert } from 'assert';
+import { strict as assert, fail } from 'assert';
 import {Game, white, black, reversePositionString} from '../src/model/hexModel.js';
 import {Evaluator, MemorySequenceValueStorage} from '../src/model/evaluator.js';
 
@@ -177,7 +177,7 @@ describe('Hex', function () {
       const game = new Game(3);
       const storage = new MemorySequenceValueStorage(3);
       let evaluator = new Evaluator(game, storage, white);
-      evaluator.evaluateNextsSync(evaluator); //game.clock.getTime() + 900);
+      evaluator.evaluateNextsSync();
       const nexts = new Map();
       game.getPossibleNexts().map(
         move => {return {move, value:evaluator.getMoveValue(move)};}
@@ -200,14 +200,14 @@ describe('Hex', function () {
       const game = new Game(3);
       const storage = new MemorySequenceValueStorage(3);
       let evaluator = new Evaluator(game, storage, white);
-      evaluator.evaluateNextsSync(evaluator, game.clock.getTime() + 900);
+      evaluator.evaluateNextsSync(game.clock.getTime() + 900);
       const nexts = new Map();
       game.getPossibleNexts().map(
         move => {return {move, value:evaluator.getMoveValue(move)};}
       ).forEach(
         mv => nexts.set(mv.move.toString(), mv.value)
       );
-      assert([... nexts.values()].every(x => x === 0 || x === -2));
+      assert([...nexts.values()].every(x => x === -12 || x === 12));
     });
 
     it('eval black', function() {
@@ -227,6 +227,46 @@ describe('Hex', function () {
       assert.equal(nexts.get('A3'), 12);
       assert.equal(nexts.get('B3'), 12);
       assert.equal(nexts.get('C1'), 12);
+    });
+/*
+    A B C D E
+    1  · · b b ·  1
+     2  b ● ● · ·  2
+      3  · · ● · ·  3
+       4  · · ● · ·  4
+        5  · · · · ·  5
+            A B C D E
+4410
+12
+[
+  [ 'B1', -20 ], [ 'E1', 20 ],
+  [ 'D2', 1 ],   [ 'A1', 1 ],
+  [ 'A3', 5 ],   [ 'E2', 20 ],
+  [ 'B3', 20 ],  [ 'D3', 20 ],
+  [ 'E3', 20 ],  [ 'A4', 20 ],
+  [ 'B4', 20 ],  [ 'D4', -20 ],
+  [ 'E4', 20 ],  [ 'A5', 1 ],
+  [ 'B5', 20 ],  [ 'C5', 20 ],
+  [ 'D5', 20 ],  [ 'E5', -20 ]
+]
+
+            */
+    
+    it('eval 5x5', function() {
+      const game = new Game(5);
+      const storage = new MemorySequenceValueStorage(5);
+      ['c3', 'a2', 'c2', 'd1', 'c4',].forEach(s => game.playFromHumanString(s, storage));
+      let evaluator = new Evaluator(game, storage, black);
+      evaluator.evaluateNextsSync(game.clock.getTime() + 1800);
+      const nexts = new Map();
+      game.getPossibleNexts().map(
+        move => {return {move, value:evaluator.getMoveValue(move)};}
+      ).forEach(
+        mv => nexts.set(mv.move.toString(), mv.value)
+      );
+      assert(nexts.get('C1') < 10);
+      console.log(nexts);
+      assert([...nexts.entries()].every(kv => kv[1] === 20 || kv[0] === 'C1' || kv[0] === 'C5'));
     });
   });
 });
